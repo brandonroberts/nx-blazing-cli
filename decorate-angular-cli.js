@@ -12,6 +12,7 @@ const fs = require('fs');
 const shelljs = require('shelljs');
 const os = require('os');
 const isWindows = os.platform() === 'win32';
+const { output } = require('@nrwl/workspace');
 
 /**
  * Paths to files being patched
@@ -25,12 +26,19 @@ const packageJsonPath = 'package.json';
  */
 function patchAngularCLI(initPath) {
   const angularCLIInit = fs.readFileSync(initPath, 'utf-8').toString();
-  const patchedCLIInit = angularCLIInit.replace('require("symbol-observable");', `
-  require("symbol-observable");
 
-  console.log('!!!Warning about using Angular CLI instead of Nx CLI if env variable not set!!!');
-  `)
-  fs.writeFileSync(initPath, patchedCLIInit);
+  if (!angularCLIInit.includes('NX_CLI_SET')) {
+    const patchedCLIInit = angularCLIInit.replace('require("symbol-observable");', `
+  require("symbol-observable");
+  const { output } = require('@nrwl/workspace');
+  
+  if (!process.env['NX_CLI_SET']) {
+    output.warn({ title: 'The Angular CLI was invoked instead of the Nx CLI. Use the nx [command] instead' });
+  }
+  `);
+
+    fs.writeFileSync(initPath, patchedCLIInit);
+  }
 }
 
 function symlinkNgCLItoNxCLI() {
@@ -38,12 +46,21 @@ function symlinkNgCLItoNxCLI() {
    * This task performs symlinking of ng to nx
    */
   // Check OS
-  if (isWindows) {
-    // If Windows, symlink
-
-  } else {
-    // If unix-based, symlink
-    shelljs.exec('ln -sf ./nx ./node_modules/.bin/ng');
+  try {
+    if (isWindows) {
+      /**
+       * Node has a built-in API to create symlinks
+       * https://nodejs.org/docs/latest-v13.x/api/fs.html
+       */
+      // If Windows, symlink
+      fs.symlinkSync('./nx', './node_modules/.bin/ng', 'junction');
+    } else {
+      // If unix-based, symlink
+      shelljs.exec('ln -sf ./nx ./node_modules/.bin/ng');
+    }
+  }
+  catch(e) {
+    output.error('Unable to create symlink from the Angular CLI to the Nx CLI');
   }
 }
 
@@ -77,4 +94,4 @@ symlinkNgCLItoNxCLI();
 patchAngularCLI(angularCLIInitPath);
 patchPackageJson(packageJsonPath);
 
-console.log('Patching complete');
+output.log('Patching of the Angular CLI completed successfully');
