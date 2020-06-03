@@ -15,6 +15,7 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 const shelljs = require('shelljs');
 const os = require('os');
 const isWindows = os.platform() === 'win32';
@@ -53,20 +54,28 @@ function symlinkNgCLItoNxCLI() {
    */
   // Check OS
   try {
+    const ngPath = './node_modules/.bin/ng';
+    const nxPath = './node_modules/.bin/nx';
+
     if (isWindows) {
       /**
        * Node has a built-in API to create symlinks
        * https://nodejs.org/docs/latest-v13.x/api/fs.html
        */
       // If Windows, symlink
-      fs.symlinkSync('./nx', './node_modules/.bin/ng', 'junction');
+      if (fs.existsSync(ngPath)) {
+        fs.unlinkSync(ngPath);
+      }
+      
+      fs.symlinkSync(nxPath, ngPath, 'junction');
     } else {
       // If unix-based, symlink
-      shelljs.exec('ln -sf ./nx ./node_modules/.bin/ng');
+      shelljs.exec(`ln -sf ./nx ${ngPath}`);
     }
   }
   catch(e) {
-    output.error({ title: 'Unable to create a symlink from the Angular CLI to the Nx CLI' });
+    output.error({ title: 'Unable to create a symlink from the Angular CLI to the Nx CLI:' + e.message });
+    throw e;
   }
 }
 
@@ -96,8 +105,12 @@ function patchPackageJson(pkgJsonPath) {
   fs.writeFileSync(pkgJsonPath, JSON.stringify(packageJson, null, 2));
 }
 
-symlinkNgCLItoNxCLI();
-patchAngularCLI(angularCLIInitPath);
-patchPackageJson(packageJsonPath);
 
-output.log({ title: 'Patching of the Angular CLI completed successfully' });
+try {
+  symlinkNgCLItoNxCLI();
+  patchAngularCLI(angularCLIInitPath);
+  patchPackageJson(packageJsonPath);
+  output.log({ title: 'Patching of the Angular CLI completed successfully' });
+} catch(e) {
+  output.error({ title: 'Patching of the Angular CLI did not complete successfully' });
+}
