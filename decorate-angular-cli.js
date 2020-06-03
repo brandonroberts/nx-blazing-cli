@@ -4,8 +4,14 @@
  * 
  * It does this by:
  * 
+ * - Patching the Angular CLI to warn you in case you accidentally use the ng command going forward.
  * - Symlinking the ng to nx command, so all commands run through the Nx CLI
  * - Updating the package.json postinstall script to give you control over this script
+ * 
+ * To opt out of this patch:
+ * - Replace occurrences of nx with ng in your package.json
+ * - Remove the script from your postinstall script in your package.json
+ * - Delete and reinstall your node_modules
  */
 
 const fs = require('fs');
